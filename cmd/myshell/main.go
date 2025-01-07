@@ -49,16 +49,17 @@ type exitCommand struct {
 type typeCommand struct {
 	name string
 	typ  commandType
+	path string
 }
 
 type commandType int
 
 const (
 	badCommand commandType = iota
-	noop
 	exit
 	echo
 	typ
+	executable
 )
 
 type command struct {
@@ -96,18 +97,36 @@ func tokenize(line string) ([]string, error) {
 
 var builtIns = map[string]commandType{"exit": exit, "echo": echo, "type": typ}
 
-func parse(line string) (command, error) {
-	toks, err := tokenize(line)
+type commandInfo struct {
+	typ  commandType
+	path string
+}
+
+func locateExecutable(name string) (string, bool) {
+	return "", false
+}
+
+func resolveCommand(name string) (commandInfo, error) {
+	builtIn, ok := builtIns[name]
+	if ok {
+		return commandInfo{typ: builtIn}, nil
+	}
+	path, ok := locateExecutable(name)
+	if ok {
+		return commandInfo{typ: executable, path: path}, nil
+	}
+	return commandInfo{}, fmt.Errorf("%s: %w", name, ErrCommandNotFound)
+}
+
+func parse(toks []string) (command, error) {
+	name, suffix := toks[0], toks[1:]
+	cmd, err := resolveCommand(name)
 	if err != nil {
 		return command{}, err
 	}
-	if len(toks) == 0 {
-		return command{typ: noop}, nil
-	}
 
-	name, suffix := toks[0], toks[1:]
-	switch name {
-	case "exit":
+	switch cmd.typ {
+	case exit:
 		if len(suffix) != 1 {
 			return command{}, fmt.Errorf("usage: exit <code>")
 		}
@@ -117,22 +136,24 @@ func parse(line string) (command, error) {
 		}
 		return command{typ: exit, cargo: exitCommand{code: code}}, nil
 
-	case "echo":
+	case echo:
 		return command{typ: echo, cargo: echoCommand{words: suffix}}, nil
 
-	case "type":
+	case typ:
 		if len(suffix) != 1 {
 			return command{}, fmt.Errorf("usage: type <command>")
 		}
-		arg := suffix[0]
-		builtIn, ok := builtIns[arg]
-		if ok {
-			return command{typ: typ, cargo: typeCommand{name: arg, typ: builtIn}}, nil
+		cmd2, err := resolveCommand(suffix[0])
+		if err != nil {
+			return command{}, err
 		}
-		return command{typ: typ, cargo: typeCommand{name: arg, typ: badCommand}}, nil
+		return command{
+			typ:   typ,
+			cargo: typeCommand{name: suffix[0], typ: cmd2.typ, path: cmd2.path},
+		}, nil
 
 	default:
-		return command{}, fmt.Errorf("%s: %w", name, ErrCommandNotFound)
+		panic(fmt.Sprintf("unhandled command: %v", cmd.typ))
 	}
 }
 
@@ -150,15 +171,23 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		cmd, err := parse(line)
+
+		toks, err := tokenize(line)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s\n", err)
+			continue
+		}
+		if len(toks) == 0 {
+			continue
+		}
+
+		cmd, err := parse(toks)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s\n", err)
 			continue
 		}
 
 		switch cmd.typ {
-		case noop:
-			continue
 		case exit:
 			os.Exit(cmd.cargo.(exitCommand).code)
 		case echo:
