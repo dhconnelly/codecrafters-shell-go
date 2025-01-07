@@ -38,6 +38,10 @@ func (p *prompter) readline() (string, error) {
 	return "", io.EOF
 }
 
+type echoCommand struct {
+	words []string
+}
+
 type exitCommand struct {
 	code int
 }
@@ -48,6 +52,7 @@ const (
 	badCommand commandType = iota
 	noop
 	exit
+	echo
 )
 
 type command struct {
@@ -103,6 +108,10 @@ func parse(line string) (command, error) {
 			return command{}, fmt.Errorf("exit: invalid code")
 		}
 		return command{typ: exit, cargo: exitCommand{code: code}}, nil
+
+	case "echo":
+		return command{typ: echo, cargo: echoCommand{words: suffix}}, nil
+
 	default:
 		return command{}, fmt.Errorf("%s: %w", name, ErrCommandNotFound)
 	}
@@ -111,6 +120,8 @@ func parse(line string) (command, error) {
 func main() {
 	// implements "Shell Command Language" per the POSIX standard:
 	// https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html
+
+	// TODO: intercept signals
 	p := newPrompter("$ ", os.Stdout, os.Stdin)
 	for {
 		line, err := p.readline()
@@ -123,12 +134,18 @@ func main() {
 		cmd, err := parse(line)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s\n", err)
+			continue
 		}
+
 		switch cmd.typ {
 		case noop:
 			continue
 		case exit:
 			os.Exit(cmd.cargo.(exitCommand).code)
+		case echo:
+			fmt.Println(strings.Join(cmd.cargo.(echoCommand).words, " "))
+		default:
+			panic(fmt.Sprintf("unhandled command: %v", cmd.typ))
 		}
 	}
 }
