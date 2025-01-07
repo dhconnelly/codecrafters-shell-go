@@ -48,11 +48,14 @@ type typeCommand struct {
 	path string
 }
 
+type executableCommand struct {
+	path string
+}
+
 type commandType int
 
 const (
-	badCommand commandType = iota
-	exit
+	exit commandType = iota
 	echo
 	typ
 	executable
@@ -114,24 +117,26 @@ func locateExecutable(name string) (string, bool) {
 	return "", false
 }
 
-func resolveCommand(name string) commandInfo {
+func resolveCommand(name string) (commandInfo, bool) {
 	builtIn, ok := builtIns[name]
 	if ok {
-		return commandInfo{typ: builtIn}
+		return commandInfo{typ: builtIn}, true
 	}
 	path, ok := locateExecutable(name)
 	if ok {
-		return commandInfo{typ: executable, path: path}
+		return commandInfo{typ: executable, path: path}, true
 	}
-	return commandInfo{typ: badCommand}
+	return commandInfo{}, false
 }
 
 func parse(toks []string) (command, error) {
 	name, suffix := toks[0], toks[1:]
-	cmd := resolveCommand(name)
-	switch cmd.typ {
-	case badCommand:
+	cmd, ok := resolveCommand(name)
+	if !ok {
 		return command{}, fmt.Errorf("%s: command not found", name)
+	}
+
+	switch cmd.typ {
 	case exit:
 		if len(suffix) != 1 {
 			return command{}, fmt.Errorf("usage: exit <code>")
@@ -149,7 +154,10 @@ func parse(toks []string) (command, error) {
 		if len(suffix) != 1 {
 			return command{}, fmt.Errorf("usage: type <command>")
 		}
-		cmd2 := resolveCommand(suffix[0])
+		cmd2, ok := resolveCommand(suffix[0])
+		if !ok {
+			return command{}, fmt.Errorf("%s: not found", suffix[0])
+		}
 		return command{
 			typ:   typ,
 			cargo: typeCommand{name: suffix[0], typ: cmd2.typ, path: cmd2.path},
@@ -198,8 +206,6 @@ func main() {
 		case typ:
 			typeCmd := cmd.cargo.(typeCommand)
 			switch typeCmd.typ {
-			case badCommand:
-				fmt.Printf("%s: not found\n", typeCmd.name)
 			case executable:
 				fmt.Printf("%s is %s\n", typeCmd.name, typeCmd.path)
 			default:
