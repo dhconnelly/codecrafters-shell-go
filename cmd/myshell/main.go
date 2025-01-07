@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
+	"strings"
+	"unicode"
 )
 
 var (
@@ -35,27 +38,97 @@ func (p *prompter) readline() (string, error) {
 	return "", io.EOF
 }
 
-type command interface{}
+type exitCommand struct {
+	code int
+}
+
+type commandType int
+
+const (
+	badCommand commandType = iota
+	noop
+	exit
+)
+
+type command struct {
+	typ   commandType
+	cargo interface{}
+}
+
+func tokenize(line string) ([]string, error) {
+	r := bufio.NewReader(strings.NewReader(line))
+	var tokens []string
+	var cur []rune
+	for {
+		// TODO: operators
+		// TODO: quoting
+		// TODO: comments
+		// TODO: assignment
+		c, _, err := r.ReadRune()
+		if err == io.EOF {
+			if len(cur) > 0 {
+				tokens = append(tokens, string(cur))
+			}
+			return tokens, nil
+		} else if err != nil {
+			return nil, err
+		} else if unicode.IsSpace(c) {
+			if len(cur) > 0 {
+				tokens = append(tokens, string(cur))
+				cur = cur[:0]
+			}
+		} else {
+			cur = append(cur, c)
+		}
+	}
+}
 
 func parse(line string) (command, error) {
-	return nil, fmt.Errorf("%s: %w", line, ErrCommandNotFound)
+	toks, err := tokenize(line)
+	if err != nil {
+		return command{}, err
+	}
+	if len(toks) == 0 {
+		return command{typ: noop}, nil
+	}
+
+	name, suffix := toks[0], toks[1:]
+	switch name {
+	case "exit":
+		if len(suffix) != 1 {
+			return command{}, fmt.Errorf("usage: exit <code>")
+		}
+		code, err := strconv.Atoi(suffix[0])
+		if err != nil {
+			return command{}, fmt.Errorf("exit: invalid code")
+		}
+		return command{typ: exit, cargo: exitCommand{code: code}}, nil
+	default:
+		return command{}, fmt.Errorf("%s: %w", name, ErrCommandNotFound)
+	}
 }
 
 func main() {
+	// implements "Shell Command Language" per the POSIX standard:
+	// https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html
 	p := newPrompter("$ ", os.Stdout, os.Stdin)
 	for {
 		line, err := p.readline()
 		if err == io.EOF {
 			break
 		}
-		if line == "" {
-			continue
-		}
 		if err != nil {
 			panic(err)
 		}
-		if _, err := parse(line); err != nil {
+		cmd, err := parse(line)
+		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s\n", err)
+		}
+		switch cmd.typ {
+		case noop:
+			continue
+		case exit:
+			os.Exit(cmd.cargo.(exitCommand).code)
 		}
 	}
 }
