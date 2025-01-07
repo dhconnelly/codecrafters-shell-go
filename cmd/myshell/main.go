@@ -49,6 +49,10 @@ type typeCommand struct {
 	path string
 }
 
+type pwdCommand struct {
+	path string
+}
+
 type executableCommand struct {
 	args []string
 }
@@ -59,6 +63,7 @@ const (
 	exit commandType = iota
 	echo
 	typ
+	pwd
 	executable
 )
 
@@ -95,7 +100,12 @@ func tokenize(line string) ([]string, error) {
 	}
 }
 
-var builtIns = map[string]commandType{"exit": exit, "echo": echo, "type": typ}
+var builtIns = map[string]commandType{
+	"exit": exit,
+	"echo": echo,
+	"type": typ,
+	"pwd":  pwd,
+}
 
 type commandInfo struct {
 	typ  commandType
@@ -171,6 +181,13 @@ func parse(toks []string) (command, error) {
 			cargo: executableCommand{args: args},
 		}, nil
 
+	case pwd:
+		wd, err := os.Getwd()
+		if err != nil {
+			return command{}, err
+		}
+		return command{typ: pwd, cargo: pwdCommand{path: wd}}, nil
+
 	default:
 		panic(fmt.Sprintf("unhandled command: %v", cmd.typ))
 	}
@@ -243,6 +260,8 @@ func main() {
 		case executable:
 			bin := cmd.cargo.(executableCommand)
 			execute(bin.args)
+		case pwd:
+			fmt.Println(cmd.cargo.(pwdCommand).path)
 		default:
 			panic(fmt.Sprintf("unhandled command: %v", cmd.typ))
 		}
