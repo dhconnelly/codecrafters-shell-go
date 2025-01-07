@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -10,10 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
-)
-
-var (
-	ErrCommandNotFound = errors.New("command not found")
 )
 
 type prompter struct {
@@ -119,26 +114,24 @@ func locateExecutable(name string) (string, bool) {
 	return "", false
 }
 
-func resolveCommand(name string) (commandInfo, error) {
+func resolveCommand(name string) commandInfo {
 	builtIn, ok := builtIns[name]
 	if ok {
-		return commandInfo{typ: builtIn}, nil
+		return commandInfo{typ: builtIn}
 	}
 	path, ok := locateExecutable(name)
 	if ok {
-		return commandInfo{typ: executable, path: path}, nil
+		return commandInfo{typ: executable, path: path}
 	}
-	return commandInfo{}, fmt.Errorf("%s: %w", name, ErrCommandNotFound)
+	return commandInfo{typ: badCommand}
 }
 
 func parse(toks []string) (command, error) {
 	name, suffix := toks[0], toks[1:]
-	cmd, err := resolveCommand(name)
-	if err != nil {
-		return command{}, err
-	}
-
+	cmd := resolveCommand(name)
 	switch cmd.typ {
+	case badCommand:
+		return command{}, fmt.Errorf("%s: command not found", name)
 	case exit:
 		if len(suffix) != 1 {
 			return command{}, fmt.Errorf("usage: exit <code>")
@@ -156,10 +149,7 @@ func parse(toks []string) (command, error) {
 		if len(suffix) != 1 {
 			return command{}, fmt.Errorf("usage: type <command>")
 		}
-		cmd2, err := resolveCommand(suffix[0])
-		if err != nil {
-			return command{}, err
-		}
+		cmd2 := resolveCommand(suffix[0])
 		return command{
 			typ:   typ,
 			cargo: typeCommand{name: suffix[0], typ: cmd2.typ, path: cmd2.path},
