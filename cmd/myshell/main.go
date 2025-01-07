@@ -2,17 +2,34 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 )
 
-// Ensures gofmt doesn't remove the "fmt" import in stage 1 (feel free to remove this!)
-var _ = fmt.Fprint
+type prompter struct {
+	prompt string
+	w      io.Writer
+	r      *bufio.Reader
+}
+
+func newPrompter(prompt string, w io.Writer, r io.Reader) *prompter {
+	return &prompter{prompt: prompt, w: w, r: bufio.NewReader(r)}
+}
+
+func (p *prompter) readline() (string, error) {
+	fmt.Fprint(p.w, p.prompt)
+	line, err := p.r.ReadString('\n')
+	if err != nil && !errors.Is(err, io.EOF) {
+		return "", err
+	}
+	return line, nil
+}
 
 func main() {
-	// Uncomment this block to pass the first stage
-	// fmt.Fprint(os.Stdout, "$ ")
-
-	// Wait for user input
-	bufio.NewReader(os.Stdin).ReadString('\n')
+	p := newPrompter("$ ", os.Stdout, os.Stdin)
+	if _, err := p.readline(); err != nil {
+		panic(err)
+	}
 }
