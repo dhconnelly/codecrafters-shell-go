@@ -53,6 +53,10 @@ type pwdCommand struct {
 	path string
 }
 
+type cdCommand struct {
+	path string
+}
+
 type executableCommand struct {
 	args []string
 }
@@ -64,6 +68,7 @@ const (
 	echo
 	typ
 	pwd
+	cd
 	executable
 )
 
@@ -105,6 +110,7 @@ var builtIns = map[string]commandType{
 	"echo": echo,
 	"type": typ,
 	"pwd":  pwd,
+	"cd":   cd,
 }
 
 type commandInfo struct {
@@ -188,6 +194,12 @@ func parse(toks []string) (command, error) {
 		}
 		return command{typ: pwd, cargo: pwdCommand{path: wd}}, nil
 
+	case cd:
+		if len(suffix) != 1 {
+			return command{}, fmt.Errorf("usage: cd <path>")
+		}
+		return command{typ: cd, cargo: cdCommand{path: suffix[0]}}, nil
+
 	default:
 		panic(fmt.Sprintf("unhandled command: %v", cmd.typ))
 	}
@@ -259,9 +271,15 @@ func main() {
 			}
 		case executable:
 			bin := cmd.cargo.(executableCommand)
-			execute(bin.args)
+			if err := execute(bin.args); err != nil {
+				fmt.Fprintf(os.Stderr, "%s\n", err)
+			}
 		case pwd:
 			fmt.Println(cmd.cargo.(pwdCommand).path)
+		case cd:
+			if err := os.Chdir(cmd.cargo.(cdCommand).path); err != nil {
+				fmt.Fprintf(os.Stderr, "%s\n", err)
+			}
 		default:
 			panic(fmt.Sprintf("unhandled command: %v", cmd.typ))
 		}
