@@ -8,6 +8,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"syscall"
 	"unicode"
 )
 
@@ -49,7 +50,7 @@ type typeCommand struct {
 }
 
 type executableCommand struct {
-	path string
+	args []string
 }
 
 type commandType int
@@ -163,9 +164,37 @@ func parse(toks []string) (command, error) {
 			cargo: typeCommand{name: suffix[0], typ: cmd2.typ, path: cmd2.path},
 		}, nil
 
+	case executable:
+		args := append([]string{cmd.path}, suffix...)
+		return command{
+			typ:   executable,
+			cargo: executableCommand{args: args},
+		}, nil
+
 	default:
 		panic(fmt.Sprintf("unhandled command: %v", cmd.typ))
 	}
+}
+
+func execute(args []string) error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+	pid, err := syscall.ForkExec(args[0], args, &syscall.ProcAttr{
+		Dir: cwd,
+		Files: []uintptr{
+			os.Stdin.Fd(),
+			os.Stdout.Fd(),
+			os.Stderr.Fd(),
+		},
+	})
+	if err != nil {
+		return err
+	}
+	var status syscall.WaitStatus
+	_, err = syscall.Wait4(pid, &status, 0, nil)
+	return err
 }
 
 func main() {
@@ -211,6 +240,9 @@ func main() {
 			default:
 				fmt.Printf("%s is a shell builtin\n", typeCmd.name)
 			}
+		case executable:
+			bin := cmd.cargo.(executableCommand)
+			execute(bin.args)
 		default:
 			panic(fmt.Sprintf("unhandled command: %v", cmd.typ))
 		}
