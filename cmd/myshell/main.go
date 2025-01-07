@@ -277,8 +277,9 @@ func main() {
 		case pwd:
 			fmt.Println(cmd.cargo.(pwdCommand).path)
 		case cd:
-			if err := os.Chdir(cmd.cargo.(cdCommand).path); err != nil {
-				fmt.Fprintf(os.Stderr, "%s\n", err)
+			path := cmd.cargo.(cdCommand).path
+			if err := os.Chdir(path); err != nil {
+				fmt.Fprintf(os.Stderr, "cd: %s: No such file or directory\n", path)
 			}
 		default:
 			panic(fmt.Sprintf("unhandled command: %v", cmd.typ))
