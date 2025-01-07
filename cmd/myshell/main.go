@@ -46,6 +46,11 @@ type exitCommand struct {
 	code int
 }
 
+type typeCommand struct {
+	name string
+	typ  commandType
+}
+
 type commandType int
 
 const (
@@ -53,6 +58,7 @@ const (
 	noop
 	exit
 	echo
+	typ
 )
 
 type command struct {
@@ -88,6 +94,8 @@ func tokenize(line string) ([]string, error) {
 	}
 }
 
+var builtIns = map[string]commandType{"exit": exit, "echo": echo, "type": typ}
+
 func parse(line string) (command, error) {
 	toks, err := tokenize(line)
 	if err != nil {
@@ -111,6 +119,17 @@ func parse(line string) (command, error) {
 
 	case "echo":
 		return command{typ: echo, cargo: echoCommand{words: suffix}}, nil
+
+	case "type":
+		if len(suffix) != 1 {
+			return command{}, fmt.Errorf("usage: type <command>")
+		}
+		arg := suffix[0]
+		builtIn, ok := builtIns[arg]
+		if ok {
+			return command{typ: typ, cargo: typeCommand{name: arg, typ: builtIn}}, nil
+		}
+		return command{typ: typ, cargo: typeCommand{name: arg, typ: badCommand}}, nil
 
 	default:
 		return command{}, fmt.Errorf("%s: %w", name, ErrCommandNotFound)
@@ -144,6 +163,14 @@ func main() {
 			os.Exit(cmd.cargo.(exitCommand).code)
 		case echo:
 			fmt.Println(strings.Join(cmd.cargo.(echoCommand).words, " "))
+		case typ:
+			typeCmd := cmd.cargo.(typeCommand)
+			switch typeCmd.typ {
+			case badCommand:
+				fmt.Printf("%s: not found\n", typeCmd.name)
+			default:
+				fmt.Printf("%s is a shell builtin\n", typeCmd.name)
+			}
 		default:
 			panic(fmt.Sprintf("unhandled command: %v", cmd.typ))
 		}
