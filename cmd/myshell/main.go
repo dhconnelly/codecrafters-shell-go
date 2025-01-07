@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"unicode"
@@ -103,6 +104,18 @@ type commandInfo struct {
 }
 
 func locateExecutable(name string) (string, bool) {
+	searchPaths := strings.Split(os.Getenv("PATH"), ":")
+	for _, searchPath := range searchPaths {
+		path := path.Join(searchPath, name)
+		stat, err := os.Stat(path)
+		if err != nil {
+			// doesn't matter what it is if we can't execute it
+			continue
+		}
+		if stat.Mode().Perm()&0100 > 0 {
+			return path, true
+		}
+	}
 	return "", false
 }
 
@@ -197,6 +210,8 @@ func main() {
 			switch typeCmd.typ {
 			case badCommand:
 				fmt.Printf("%s: not found\n", typeCmd.name)
+			case executable:
+				fmt.Printf("%s is %s\n", typeCmd.name, typeCmd.path)
 			default:
 				fmt.Printf("%s is a shell builtin\n", typeCmd.name)
 			}
