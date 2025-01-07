@@ -198,7 +198,11 @@ func parse(toks []string) (command, error) {
 		if len(suffix) != 1 {
 			return command{}, fmt.Errorf("usage: cd <path>")
 		}
-		return command{typ: cd, cargo: cdCommand{path: suffix[0]}}, nil
+		path := suffix[0]
+		if path == "~" {
+			path = os.Getenv("HOME")
+		}
+		return command{typ: cd, cargo: cdCommand{path: path}}, nil
 
 	default:
 		panic(fmt.Sprintf("unhandled command: %v", cmd.typ))
