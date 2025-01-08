@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"regexp"
 	"strconv"
 	"strings"
 	"unicode"
@@ -72,36 +73,44 @@ func resolvePath(path string) string {
 	return path
 }
 
-func tokenize(line string) ([]string, error) {
-	r := bufio.NewReader(strings.NewReader(line))
-	var tokens []string
-	var cur []rune
-	for {
-		// TODO: operators
-		// TODO: quoting
-		// TODO: comments
-		// TODO: assignment
-		c, _, err := r.ReadRune()
-		if err == io.EOF {
-			if len(cur) > 0 {
-				tokens = append(tokens, string(cur))
-			}
-			return tokens, nil
-		} else if err != nil {
-			return nil, err
-		} else if unicode.IsSpace(c) {
-			if len(cur) > 0 {
-				tokens = append(tokens, string(cur))
-				cur = cur[:0]
-			}
-		} else {
-			cur = append(cur, c)
-		}
+type tokenType int
+
+const (
+	tokenWord tokenType = iota
+	tokenIONumber
+	tokenOpGt
+)
+
+type token struct {
+	typ   tokenType
+	cargo string
+}
+
+func isDelim(c rune) bool {
+	return unicode.IsSpace(c) || c == '>'
+}
+
+var allDigits = regexp.MustCompile(`^\d+$`)
+
+func emit(cargo string, delim rune) token {
+	// https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html#tag_19_10_01
+	if cargo == ">" {
+		return token{typ: tokenOpGt, cargo: cargo}
+	} else if allDigits.MatchString(cargo) && delim == '>' {
+		return token{typ: tokenIONumber, cargo: cargo}
+	} else {
+		return token{typ: tokenWord, cargo: cargo}
 	}
 }
 
-func parse(toks []string) (command, error) {
-	name, suffix := toks[0], toks[1:]
+func parse(toks []token) (command, error) {
+	fmt.Println(toks)
+	name := toks[0].cargo
+	suffix := make([]string, len(toks)-1)
+	for i, tok := range toks[1:] {
+		suffix[i] = tok.cargo
+	}
+
 	cmd, ok := resolveCommand(name)
 	if !ok {
 		return nil, fmt.Errorf("%s: command not found", name)
@@ -148,5 +157,35 @@ func parse(toks []string) (command, error) {
 
 	default:
 		panic(fmt.Sprintf("unhandled command: %v", cmd.typ))
+	}
+}
+
+func tokenize(line string) ([]token, error) {
+	r := bufio.NewReader(strings.NewReader(line))
+	var tokens []token
+	var cur []rune
+	for {
+		// TODO: quoting
+		// TODO: comments
+		// TODO: assignment
+		c, _, err := r.ReadRune()
+		if err == io.EOF {
+			if len(cur) > 0 {
+				tokens = append(tokens, emit(string(cur), 0))
+			}
+			return tokens, nil
+		} else if err != nil {
+			return nil, err
+		} else if isDelim(c) {
+			if len(cur) > 0 {
+				tokens = append(tokens, emit(string(cur), c))
+				cur = cur[:0]
+			}
+			if !unicode.IsSpace(c) {
+				cur = append(cur, c)
+			}
+		} else {
+			cur = append(cur, c)
+		}
 	}
 }

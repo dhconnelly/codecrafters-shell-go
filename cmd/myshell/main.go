@@ -32,12 +32,19 @@ func main() {
 			continue
 		}
 
+		env := defaultEnv()
+		toks, err = applyRedirects(&env, toks)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s\n", err)
+			continue
+		}
+
 		cmd, err := parse(toks)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s\n", err)
 			continue
 		}
 
-		cmd.Execute()
+		cmd.Execute(env)
 	}
 }
