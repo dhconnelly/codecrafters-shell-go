@@ -42,7 +42,7 @@ func applyRedirects(env *environment, toks []token) ([]token, error) {
 			}
 			target := toks[i+1].cargo
 			perms := 0644 // TODO
-			f, err := os.OpenFile(target, os.O_WRONLY|os.O_TRUNC, os.FileMode(perms))
+			f, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(perms))
 			if err != nil {
 				return nil, err
 			}
