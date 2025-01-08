@@ -103,13 +103,8 @@ func emit(cargo string, delim rune) token {
 	}
 }
 
-func parse(toks []token) (command, error) {
-	fmt.Println(toks)
-	name := toks[0].cargo
-	suffix := make([]string, len(toks)-1)
-	for i, tok := range toks[1:] {
-		suffix[i] = tok.cargo
-	}
+func parse(toks []string) (command, error) {
+	name, suffix := toks[0], toks[1:]
 
 	cmd, ok := resolveCommand(name)
 	if !ok {

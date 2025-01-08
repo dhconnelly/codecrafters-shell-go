@@ -19,8 +19,8 @@ func applyRedirect(env *environment, sourceFd int, dest *os.File) error {
 	}
 }
 
-func applyRedirects(env *environment, toks []token) ([]token, error) {
-	var out []token
+func applyRedirects(env *environment, toks []token) ([]string, error) {
+	var out []string
 	var err error
 	sourceFd := 1
 	i := 0
@@ -53,7 +53,7 @@ func applyRedirects(env *environment, toks []token) ([]token, error) {
 			i += 2
 
 		case tokenWord:
-			out = append(out, tok)
+			out = append(out, tok.cargo)
 			i++
 		}
 	}
