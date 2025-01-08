@@ -158,29 +158,35 @@ func parse(toks []string) (command, error) {
 func tokenize(line string) ([]token, error) {
 	r := bufio.NewReader(strings.NewReader(line))
 	var tokens []token
-	var cur []rune
+	var cur []string
 	for {
-		// TODO: quoting
 		// TODO: comments
 		// TODO: assignment
 		c, _, err := r.ReadRune()
 		if err == io.EOF {
 			if len(cur) > 0 {
-				tokens = append(tokens, emit(string(cur), 0))
+				tokens = append(tokens, emit(strings.Join(cur, ""), 0))
 			}
 			return tokens, nil
 		} else if err != nil {
 			return nil, err
+		} else if c == '"' || c == '\'' {
+			// TODO: escapes
+			s, err := r.ReadString(byte(c))
+			if err != nil {
+				return nil, fmt.Errorf("syntax error: unterminated %c", c)
+			}
+			cur = append(cur, s[:len(s)-1])
 		} else if isDelim(c) {
 			if len(cur) > 0 {
-				tokens = append(tokens, emit(string(cur), c))
+				tokens = append(tokens, emit(strings.Join(cur, ""), c))
 				cur = cur[:0]
 			}
 			if !unicode.IsSpace(c) {
-				cur = append(cur, c)
+				cur = append(cur, string(c))
 			}
 		} else {
-			cur = append(cur, c)
+			cur = append(cur, string(c))
 		}
 	}
 }
