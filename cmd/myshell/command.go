@@ -61,15 +61,14 @@ func (cmd cdCommand) Execute() {
 }
 
 type executableCommand struct {
-	name string
+	path string
 	args []string
 }
 
 func (cmd executableCommand) Execute() {
 	// this is basically os/exec.Command.Run
 	cwd, _ := os.Getwd()
-	args := append([]string{cmd.name}, cmd.args...)
-	pid, err := syscall.ForkExec(cmd.name, args, &syscall.ProcAttr{
+	pid, err := syscall.ForkExec(cmd.path, cmd.args, &syscall.ProcAttr{
 		Dir: cwd,
 		Files: []uintptr{
 			os.Stdin.Fd(),

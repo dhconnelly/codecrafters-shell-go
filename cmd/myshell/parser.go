@@ -143,7 +143,8 @@ func parse(toks []string) (command, error) {
 		return cdCommand{path: path}, nil
 
 	case executable:
-		return executableCommand{name: cmd.path, args: suffix}, nil
+		args := append([]string{name}, suffix...)
+		return executableCommand{path: cmd.path, args: args}, nil
 
 	default:
 		panic(fmt.Sprintf("unhandled command: %v", cmd.typ))
