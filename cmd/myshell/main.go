@@ -10,7 +10,6 @@ func main() {
 	// implements "Shell Command Language" per the POSIX standard:
 	// https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html
 
-	// TODO: intercept signals
 	p := newPrompter("$ ", os.Stdout, os.Stdin)
 	for {
 		line, err := p.readline()
@@ -19,6 +18,9 @@ func main() {
 		}
 		if err != nil {
 			panic(err)
+		}
+		if line == "" {
+			continue
 		}
 
 		toks, err := tokenize(line)
