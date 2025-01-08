@@ -162,6 +162,7 @@ func tokenize(line string) ([]token, error) {
 	r := bufio.NewReader(strings.NewReader(line))
 	var tokens []token
 	var cur []string
+	escaped := false
 	for {
 		// TODO: comments
 		// TODO: assignment
@@ -173,6 +174,11 @@ func tokenize(line string) ([]token, error) {
 			return tokens, nil
 		} else if err != nil {
 			return nil, err
+		} else if escaped {
+			cur = append(cur, string(c))
+			escaped = false
+		} else if c == '\\' {
+			escaped = true
 		} else if c == '"' || c == '\'' {
 			// TODO: escapes
 			s, err := r.ReadString(byte(c))
