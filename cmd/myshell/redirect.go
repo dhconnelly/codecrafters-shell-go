@@ -6,16 +6,31 @@ import (
 	"strconv"
 )
 
-func applyRedirect(env *environment, sourceFd int, dest *os.File) error {
+func applyRedirect(env *environment, sourceFd int, target string, flag int) error {
+	perms := 0644 // TODO
+	f, err := os.OpenFile(target, flag, os.FileMode(perms))
+	if err != nil {
+		return err
+	}
 	switch sourceFd {
 	case 1:
-		env.stdout = dest
+		env.stdout = f
 		return nil
 	case 2:
-		env.stderr = dest
+		env.stderr = f
 		return nil
 	default:
 		return fmt.Errorf("error: redirecting fd %d not supported", sourceFd)
+	}
+}
+
+func flagForOp(typ tokenType) int {
+	if typ == tokenOpGt {
+		return os.O_CREATE | os.O_WRONLY | os.O_TRUNC
+	} else if typ == tokenOpGtGt {
+		return os.O_CREATE | os.O_WRONLY | os.O_APPEND
+	} else {
+		panic("unhandled token type")
 	}
 }
 
@@ -37,16 +52,14 @@ func applyRedirects(env *environment, toks []token) ([]string, error) {
 			i++
 
 		case tokenOpGt:
+			fallthrough
+		case tokenOpGtGt:
 			if i+1 >= len(toks) {
 				return nil, fmt.Errorf("syntax error: missing redirection target")
 			}
 			target := toks[i+1].cargo
-			perms := 0644 // TODO
-			f, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(perms))
-			if err != nil {
-				return nil, err
-			}
-			if err = applyRedirect(env, sourceFd, f); err != nil {
+			flag := flagForOp(tok.typ)
+			if err = applyRedirect(env, sourceFd, target, flag); err != nil {
 				return nil, err
 			}
 			sourceFd = 1

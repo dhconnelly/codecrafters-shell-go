@@ -79,6 +79,7 @@ const (
 	tokenWord tokenType = iota
 	tokenIONumber
 	tokenOpGt
+	tokenOpGtGt
 )
 
 type token struct {
@@ -96,6 +97,8 @@ func emit(cargo string, delim rune) token {
 	// https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html#tag_19_10_01
 	if cargo == ">" {
 		return token{typ: tokenOpGt, cargo: cargo}
+	} else if cargo == ">>" {
+		return token{typ: tokenOpGtGt, cargo: cargo}
 	} else if allDigits.MatchString(cargo) && delim == '>' {
 		return token{typ: tokenIONumber, cargo: cargo}
 	} else {
@@ -177,6 +180,9 @@ func tokenize(line string) ([]token, error) {
 				return nil, fmt.Errorf("syntax error: unterminated %c", c)
 			}
 			cur = append(cur, s[:len(s)-1])
+		} else if c == '>' && len(cur) == 1 && cur[0] == ">" {
+			tokens = append(tokens, emit(">>", 0))
+			cur = cur[:0]
 		} else if isDelim(c) {
 			if len(cur) > 0 {
 				tokens = append(tokens, emit(strings.Join(cur, ""), c))
