@@ -179,13 +179,47 @@ func tokenize(line string) ([]token, error) {
 			escaped = false
 		} else if c == '\\' {
 			escaped = true
-		} else if c == '"' || c == '\'' {
-			// TODO: escapes
+		} else if c == '\'' {
 			s, err := r.ReadString(byte(c))
 			if err != nil {
 				return nil, fmt.Errorf("syntax error: unterminated %c", c)
 			}
 			cur = append(cur, s[:len(s)-1])
+		} else if c == '"' {
+			escaped2 := false
+			var cur2 []rune
+			for {
+				c, _, err := r.ReadRune()
+				if err != nil {
+					return nil, err
+				}
+				if escaped2 {
+					escaped2 = false
+					switch c {
+					case '\\':
+						fallthrough
+					case '$':
+						fallthrough
+					case '"':
+						fallthrough
+					case '\n':
+						// TODO: newline doesn't work. need to lift this behavior
+						// into readline :(
+						cur2 = append(cur2, c)
+					default:
+						cur2 = append(cur2, '\\')
+						cur2 = append(cur2, c)
+					}
+				} else if c == '\\' {
+					escaped2 = true
+				} else if c == '"' {
+					break
+				} else {
+					cur2 = append(cur2, c)
+				}
+			}
+			cur = append(cur, string(cur2))
+
 		} else if c == '>' && len(cur) == 1 && cur[0] == ">" {
 			tokens = append(tokens, emit(">>", 0))
 			cur = cur[:0]
